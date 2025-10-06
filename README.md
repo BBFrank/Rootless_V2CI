@@ -12,7 +12,7 @@ The rootless_v2ci engine starts by loading a configuration file where the user s
 - Build refresh interval;
 - Update detection strategy (on the main project repository or on those of its dependencies).
 
-Then rootless_v2ci creates chroot environments through debootstrap for all requested architectures, merging architecture declarations across projects, and spawns a builder daemon for each project. Every builder daemon manages one thread per architecture; each thread produces the static binaries for its `<project, architecture>` pair.
+Then rootless_v2ci creates chroot environments through debootstrap for all requested architectures, merging architecture declarations across projects, and spawns a builder daemon for each project. Every builder daemon manages one thread per architecture; each thread produces the static binaries for its `<project, architecture>` pair, compiling the project and its dependencies inside the corresponding chroot environment, thanks to the `qemu-user-static` emulation (that must be installed on the host).
 
 ## Quickstart
 
