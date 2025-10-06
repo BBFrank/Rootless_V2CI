@@ -25,7 +25,7 @@ Install the minimal required dependencies:
 ```bash
 sudo apt update
 sudo apt upgrade
-sudo apt install debootstrap build-essential cmake git libexecs-dev libyaml-dev
+sudo apt install debootstrap qemu-user-static binfmt-support build-essential cmake git libexecs-dev libyaml-dev
 ```
 
 #### Engine Configuration
