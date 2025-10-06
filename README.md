@@ -63,6 +63,7 @@ make
 > ```cmake
 > set(LIBYAML "/usr/lib/x86_64-linux-gnu/libyaml.a")
 > ```
+> If you also encounter linking issues with the execs library, ensure the `libexecs-dev` package is properly installed (or build it from source: https://salsa.debian.org/virtualsquare-team/s2argv-execs.git and install it manually). Then edit the `target_link_libraries` entries in `CMakeLists.txt`, replacing `execs` with the absolute path to `libexecs.a` (e.g. `/usr/local/lib/libexecs.a`).
 
 ### Run
 
