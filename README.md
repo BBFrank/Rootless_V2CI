@@ -49,7 +49,7 @@ sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 
 ### Build from Source
 
-To build rootless_v2ci locally instead of using the pre-built static binaries:
+To build rootless_v2ci locally run:
 
 ```bash
 cd rootless_V2CI
