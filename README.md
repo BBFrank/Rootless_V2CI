@@ -85,7 +85,7 @@ Stop the daemons:
 
 No. rootless_v2ci leverages an `_enter` script generated inside each rootfs environment to perform a chroot-like operation through user namespaces without requiring root privileges.
 
-### Log Monitoring
+## Log Monitoring
 
 rootless_v2ci starts by printing to `stdout` and announces the log file path before switching output destinations. Logs are written to:
 
@@ -96,7 +96,7 @@ rootless_v2ci starts by printing to `stdout` and announces the log file path bef
 
 Here, `<build_dir>` is the build directory defined in `config.yml` and `<project_name>` is the project name being cross-compiled.
 
-### Final Binaries
+## Final Binaries
 
 Upon completion, static binaries are stored in the directory specified by each project’s `target_dir`. For a project named `<project_name>`, the static binary for architecture `<arch>` resides at:
 
