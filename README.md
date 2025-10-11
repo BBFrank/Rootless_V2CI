@@ -1,10 +1,10 @@
-# Rootless_v2ci — Rootless Continuous Integration for Virtualsquare Projects
+# Rootless_V2CI — Rootless Continuous Integration for Virtualsquare Projects
 
-Rootless_v2ci is a continuous integration system designed to run time-based cross-compilations on Debian hosts without root privileges. It targets unofficial Virtualsquare projects, available at [https://github.com/virtualsquare](https://github.com/virtualsquare).
+Rootless_V2CI is a continuous integration system designed to run time-based cross-compilations on Debian hosts without root privileges. It targets unofficial Virtualsquare projects, available at [https://github.com/virtualsquare](https://github.com/virtualsquare).
 
 ## Build Workflow Overview
 
-The rootless_v2ci engine starts by loading a configuration file where the user specifies the projects to cross-compile together with several options for each project, such as:
+The Rootless_V2CI engine starts by loading a configuration file where the user specifies the projects to cross-compile together with several options for each project, such as:
 
 - APT packages to install;
 - Sources that must be built manually (and their sub-dependencies);
@@ -12,7 +12,7 @@ The rootless_v2ci engine starts by loading a configuration file where the user s
 - Build refresh interval;
 - Update detection strategy (on the main project repository or on those of its dependencies).
 
-Then rootless_v2ci creates chroot environments through debootstrap for all requested architectures, merging architecture declarations across projects, and spawns a builder daemon for each project. Every builder daemon manages one thread per architecture; each thread produces the static binaries for its `<project, architecture>` pair, compiling the project and its dependencies inside the corresponding chroot environment, thanks to the `qemu-user-static` emulation (that must be installed on the host).
+Then Rootless_V2CI creates chroot environments through debootstrap for all requested architectures, merging architecture declarations across projects, and spawns a builder daemon for each project. Every builder daemon manages one thread per architecture; each thread produces the static binaries for its `<project, architecture>` pair, compiling the project and its dependencies inside the corresponding chroot environment, thanks to the `qemu-user-static` emulation (that must be installed on the host).
 
 ## Quickstart
 
@@ -42,7 +42,7 @@ Edit `src/include/types/types.h` to match your environment:
 ```
 
 #### AppArmor restrictions on Ubuntu >= 24.04
-If the user wishes to run rootless_v2ci on a host with `Ubuntu 24.04` or later, a kernel configuration related to AppArmor must be changed. In recent Ubuntu versions, AppArmor enforces stricter security profiles, adding (by default) checks on user namespace creation by unprivileged users/processes. Since rootless_v2ci aims to complete the debootstrap phase for cross‑compilation without elevated privileges, the program, instead of using chroot, adopts a user‑namespace‑based approach. Therefore, before launching the program, you must change the AppArmor configuration (only on Ubuntu hosts >= 24.04) by executing:
+If the user wishes to run rootless_v2ci on a host with `Ubuntu 24.04` or later, a kernel configuration related to AppArmor must be changed. In recent Ubuntu versions, AppArmor enforces stricter security profiles, adding (by default) checks on user namespace creation by unprivileged users/processes. Since Rootless_V2CI aims to complete the debootstrap phase for cross‑compilation without elevated privileges, the program, instead of using chroot, adopts a user‑namespace‑based approach. Therefore, before launching the program, you must change the AppArmor configuration (only on Ubuntu hosts >= 24.04) by executing:
 ```bash
 sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
 ```
@@ -83,11 +83,11 @@ Stop the daemons:
 
 #### Do I Need `sudo`?
 
-No. rootless_v2ci leverages an `_enter` script generated inside each rootfs environment to perform a chroot-like operation through user namespaces without requiring root privileges.
+No. Rootless_V2CI leverages an `_enter` script generated inside each rootfs environment to perform a chroot-like operation through user namespaces without requiring root privileges.
 
 ## Log Monitoring
 
-rootless_v2ci starts by printing to `stdout` and announces the log file path before switching output destinations. Logs are written to:
+Rootless_V2CI produces many types of logs during its operation. It starts by printing to `stdout` and announces the next log file path before switching output destinations. Logs are written to:
 
 1. `<build_dir>/logs/main.log` — setup of chroot environments and daemon startup.
 2. `<build_dir>/<project_name>/logs/worker.log` — main builder daemon logs for the project.
@@ -95,6 +95,9 @@ rootless_v2ci starts by printing to `stdout` and announces the log file path bef
 4. `/home/<project_name>/logs/worker.log` — inner execution logs inside the chroot for that thread.
 
 Here, `<build_dir>` is the build directory defined in `config.yml` and `<project_name>` is the project name being cross-compiled.
+
+### Log Monitoring via Elastic Stack
+To enable centralized, automated, and simplified monitoring (in terms of search, filters, inspection, and visualization) of the logs generated by Rootless_V2CI, a containerized cluster has been prepared that runs a complete Elastic Stack instance (Elasticsearch, Logstash, and Kibana) and a log monitoring service (Filebeat) on the host where Rootless_V2CI runs. This system can be installed, configured, and executed so that it communicates correctly with the Rootless_V2CI engine, as described in the dedicated repository at https://github.com/BBFrank/Rootless_V2CI_logs_ingestion_system
 
 ## Final Binaries
 
