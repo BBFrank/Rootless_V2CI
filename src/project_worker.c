@@ -131,7 +131,7 @@ int project_worker(project_t *prj, char *main_build_dir) {
         snprintf(chroot_build_dir, sizeof(chroot_build_dir), "/home/%s", prj->name);
         snprintf(worker_tmp_chroot_log_file, sizeof(worker_tmp_chroot_log_file), "%s/logs/worker.log", chroot_build_dir);
         
-        if (strcmp(prj->build_mode, "main") == 0) {
+        if (strcmp(prj->build_mode, "main") == 0 || strcmp(prj->build_mode, "full") == 0) {
             // Check for updates in main repo
             char *main_repo_name = NULL;
             int extract_result = extract_repo_name(prj->repo_url, &main_repo_name);
@@ -154,7 +154,8 @@ int project_worker(project_t *prj, char *main_build_dir) {
                 }
                 continue;
             }
-        } else if (strcmp(prj->build_mode, "dep") == 0) {
+        } 
+        if (strcmp(prj->build_mode, "dep") == 0 || (strcmp(prj->build_mode, "full") == 0 && !need2update)) {
             // For each manual dependency, check for updates
             manual_dependency_t *cur_manual = prj->manual_dependencies;
             while (cur_manual) {

@@ -23,7 +23,7 @@ projects:
             - libcap-ng-dev
             - libseccomp-dev
     build-config:
-      build_mode: main  # Supported build modes: main (build only if the main repo has new commits), dep (build if any dependency repo has new commits)
+      build_mode: main  # Supported build modes: "main" (build only if the main repo has new commits), "dep" (build if any dependency repo has new commits), "full" (build if the main repo or any dependency repo has new commits)
       poll_interval: 3600 # Time interval (in seconds) between two consecutive checks for new commits
     architectures:  # List of target architectures for cross-compilation (all supported architectures are listed below)
       - amd64
