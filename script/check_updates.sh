@@ -14,6 +14,11 @@ if [ -z "$chroot_dir" ] || [ -z "$chroot_build_dir" ] || [ -z "$repo_name" ] || 
     exit 1
 fi
 
+if [ ! -d "$chroot_dir/home" ]; then
+    # The chroot is not set up, we need recovery operations
+    exit 1
+fi
+
 if [ ! -d "$chroot_dir$chroot_build_dir/$repo_name" ]; then
     # The repo directory does not exist, so it must be the first run - we need to perform the clone
     exit 2

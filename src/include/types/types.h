@@ -6,10 +6,8 @@
 #include <pthread.h>
 #include <signal.h>
 
-//#define DEFAULT_CONFIG_PATH "~/.config/v2ci/config.yml"         // Substitute with the actual absolute path of the config file (path/to/config.yml)
-#define DEFAULT_CONFIG_PATH "~/Scrivania/terzo_anno/Tesi/rootless_V2CI/config.yml"
-//#define SCRIPTS_DIR_PATH "/usr/lib/v2ci/scripts"                // Substitute with the actual absolute path of the scripts directory
-#define SCRIPTS_DIR_PATH "~/Scrivania/terzo_anno/Tesi/rootless_V2CI/script"
+#define DEFAULT_CONFIG_PATH "~/.config/v2ci/config.yml"         // Substitute with the actual absolute path of the config file (path/to/config.yml)
+#define SCRIPTS_DIR_PATH "/usr/lib/v2ci/scripts"                // Substitute with the actual absolute path of the scripts directory
 #define CHROOT_SETUP_SCRIPT_PATH SCRIPTS_DIR_PATH "/chroot_setup.sh"
 #define CHECK_UPDATES_SCRIPT_PATH SCRIPTS_DIR_PATH "/check_updates.sh"
 #define INSTALL_PACKAGES_SCRIPT_PATH SCRIPTS_DIR_PATH "/install_packages_in_chroot.sh"
