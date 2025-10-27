@@ -50,6 +50,18 @@ typedef struct manual_dependency {
     struct manual_dependency *next;
 } manual_dependency_t;
 
+typedef struct binaries_limits_for_project {
+    int daily_mem_limit;
+    int weekly_mem_limit;
+    int monthly_mem_limit;
+    int yearly_mem_limit;
+
+    // Note: the daily interval correspond to poll_interval of the project
+    int weekly_interval;
+    int monthly_interval;
+    int yearly_interval;
+} binaries_limits_for_project_t;
+
 typedef struct project {
     char name[64];
     char main_project_build_dir[CONFIG_ATTR_LEN];       // <cfg.build_dir>/<project.name>
@@ -70,6 +82,8 @@ typedef struct project {
 
     manual_dependency_t *manual_dependencies;
     int manual_dep_count;
+
+    binaries_limits_for_project_t *binaries_limits;
 
     struct project *next;
 } project_t;

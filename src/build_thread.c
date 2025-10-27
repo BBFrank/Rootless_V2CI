@@ -145,7 +145,7 @@ void *build_thread(void *arg) {
 
     // Clone or pull the sources of the main project and all its manual dependencies
     if (*terminate_flag) {
-        formatted_log(log_fp, "ERROR", __FILE__, __LINE__, prj->name, arch, "Termination signal received before cloning sources for architecture %s for project %s, exiting...", arch, prj->name);
+        formatted_log(log_fp, "INTERRUPT", __FILE__, __LINE__, prj->name, arch, "Termination signal received before cloning sources for architecture %s for project %s, exiting...", arch, prj->name);
         result->error_message = "Termination signal received before cloning sources";
         return (void *)result;
     }
@@ -160,7 +160,7 @@ void *build_thread(void *arg) {
 
     // Start the build process in the chroot (compilation of manual dependencies and main project)
     if (*terminate_flag) {
-        formatted_log(log_fp, "ERROR", __FILE__, __LINE__, prj->name, arch, "Termination signal received before starting build for architecture %s for project %s, exiting...", arch, prj->name);
+        formatted_log(log_fp, "INTERRUPT", __FILE__, __LINE__, prj->name, arch, "Termination signal received before starting build for architecture %s for project %s, exiting...", arch, prj->name);
         result->error_message = "Termination signal received before starting build";
         return (void *)result;
     }

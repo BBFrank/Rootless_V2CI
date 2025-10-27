@@ -1,17 +1,27 @@
-build_dir: /home/user/v2ci_build # Directory where rootfs environments, logs and build artifacts will be stored (the user must have write permissions here)
+build_dir: /home/francesco/v2ci_build # Directory where rootfs environments, logs and build artifacts will be stored (the user must have write permissions here)
 
 projects:
   - name: sshlirp
-    target_dir: /home/user/sshlirp_build/target_binaries # Directory where the final static binaries will be stored (the user must have write permissions here)
+    target_dir: /home/francesco/sshlirp_build/target_binaries # Directory where the final static binaries will be stored (the user must have write permissions here)
+    binaries-config:  # Configuration for storing built binaries, in order to avoid the target_dir becoming too large over time and to rotate old binaries
+      interval:   # Time interval (in minutes) between two consecutive builds (it allows to store in $targerdir/weekly, $targerdir/monthly, $targerdir/yearly the produced binaries that are this interval apart form each other)
+        weekly: 1440    # e.g. 1440 minutes = 1 day (one day apart from one saved binary to another in the "weekly" folder)
+        monthly: 10080  # e.g. 10080 minutes = 7 days (one week apart from one saved binary to another in the "monthly" folder)
+        yearly: 43200   # e.g. 43200 minutes = 30 days (one month apart from one saved binary to another in the "yearly" folder)
+      mem-limit:  # Maximum storage space (in MB) allowed for each folder inside target_dir
+        daily: 500       # Maximum storage space (in MB) allowed for the "daily" folder inside target_dir
+        weekly: 2000     # Maximum storage space (in MB) allowed for the "weekly" folder inside target_dir
+        monthly: 5000    # Maximum storage space (in MB) allowed for the "monthly" folder inside target_dir
+        yearly: 20000    # Maximum storage space (in MB) allowed for the "yearly" folder inside target_dir
     source:
-      main_repo: 
+      main_repo:
         git_url: https://github.com/virtualsquare/sshlirp
         build_system: cmake # Supported build systems: cmake, meson, autotools, makefile
       dependencies:   # List of APT packages to install inside each rootfs environment
         - pkg-config
         - libglib2.0-dev
         - libvdeplug-dev
-      dependency_repos: 
+      dependency_repos:
         - git_url: https://gitlab.freedesktop.org/slirp/libslirp.git
           build_system: meson
           dependencies:   # List of APT packages to install inside each rootfs environment for this dependency
@@ -23,8 +33,8 @@ projects:
             - libcap-ng-dev
             - libseccomp-dev
     build-config:
-      build_mode: main  # Supported build modes: "main" (build only if the main repo has new commits), "dep" (build if any dependency repo has new commits), "full" (build if the main repo or any dependency repo has new commits)
-      poll_interval: 3600 # Time interval (in seconds) between two consecutive checks for new commits
+      build_mode: full  # Supported build modes: "main" (build only if the main repo has new commits), "dep" (build if any dependency repo has new commits), "full" (build if the main repo or any dependency repo has new commits)
+      poll_interval: 180 # Time interval (in seconds) between two consecutive checks for new commits
     architectures:  # List of target architectures for cross-compilation (all supported architectures are listed below)
       - amd64
       - arm64
