@@ -25,7 +25,7 @@ Install the minimal required dependencies:
 ```bash
 sudo apt update
 sudo apt upgrade
-sudo apt install debootstrap qemu-user-static binfmt-support build-essential cmake git libexecs-dev libyaml-dev
+sudo apt install debootstrap qemu-user-static binfmt-support build-essential cmake git libexecs-dev libyaml-dev cron
 ```
 
 #### Engine Configuration
@@ -81,6 +81,8 @@ Stop the daemons:
 ./v2ci_stop
 ```
 
+> **Note:** `v2ci_start` also sets up a cron job that every day at midnight rotates old binaries stored in the target directories of each project, based on the memory and time interval policies defined in `config.yml`. `v2ci_stop` does not remove this cron job; to remove it, manually edit the user’s crontab with `crontab -e`.
+
 #### Do I Need `sudo`?
 
 No. Rootless_V2CI leverages an `_enter` script generated inside each rootfs environment to perform a chroot-like operation through user namespaces without requiring root privileges.
@@ -92,7 +94,8 @@ Rootless_V2CI produces many types of logs during its operation. It starts by pri
 1. `<build_dir>/logs/main.log` — setup of chroot environments and daemon startup.
 2. `<build_dir>/<project_name>/logs/worker.log` — main builder daemon logs for the project.
 3. `<build_dir>/<project_name>/logs/<arch>-worker.log` — outer execution logs for the architecture-specific thread.
-4. `/home/<project_name>/logs/worker.log` — inner execution logs inside the chroot for that thread.
+4. `<build_dir>/<project_name>/logs/binaries_rotation_cronjob.log` — logs for the cron job that is responsible for rotating old binaries.
+5. `/home/<project_name>/logs/worker.log` — inner execution logs inside the chroot for that thread.
 
 Here, `<build_dir>` is the build directory defined in `config.yml` and `<project_name>` is the project name being cross-compiled.
 
@@ -104,7 +107,8 @@ To enable centralized, automated, and simplified monitoring (in terms of search,
 Upon completion, static binaries are stored in the directory specified by each project’s `target_dir`. For a project named `<project_name>`, the static binary for architecture `<arch>` resides at:
 
 ```
-<target_dir>/<release>/<project_name>-<arch>
+<target_dir>/<time_frame>/<project_name>-<release>-<arch>
 ```
 
+`<time_frame>` corresponds to the build time frame that could be `daily`, `weekly`, `monthly` or `yearly` based on the time of the completion of the build, while
 `<release>` corresponds to the latest GitHub release tag or defaults to `unstable` when no tag exists.

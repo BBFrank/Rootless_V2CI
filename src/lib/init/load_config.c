@@ -23,10 +23,10 @@
 
 #define DEFAULT_BUILD_MODE "full"
 #define DEFAULT_POLL_INTERVAL 180
-#define DEFAULT_DAILY_MEM_LIMIT 500
-#define DEFAULT_WEEKLY_MEM_LIMIT 2000
-#define DEFAULT_MONTHLY_MEM_LIMIT 5000
-#define DEFAULT_YEARLY_MEM_LIMIT 20000
+#define DEFAULT_DAILY_MEM_LIMIT 10000       // 10 MB
+#define DEFAULT_WEEKLY_MEM_LIMIT 50000      // 50 MB
+#define DEFAULT_MONTHLY_MEM_LIMIT 200000    // 200 MB
+#define DEFAULT_YEARLY_MEM_LIMIT 1000000    // 1 GB
 #define DEFAULT_WEEKLY_INTERVAL 1440
 #define DEFAULT_MONTHLY_INTERVAL 10080
 #define DEFAULT_YEARLY_INTERVAL 43200
@@ -337,6 +337,7 @@ int load_config(Config *cfg) {
                     // Add paths required by the worker responsible for building this project
                     snprintf(prj->main_project_build_dir, sizeof(prj->main_project_build_dir), "%s/%s", cfg->build_dir, prj->name);
                     snprintf(prj->worker_log_file, sizeof(prj->worker_log_file), "%s/logs/worker.log", prj->main_project_build_dir);
+                    snprintf(prj->cronjob_log_file, sizeof(prj->cronjob_log_file), "%s/logs/binaries_rotation_cronjob.log", prj->main_project_build_dir);
                 }
                 break;
             case YAML_SEQUENCE_END_EVENT:

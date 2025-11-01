@@ -143,7 +143,6 @@ int main() {
         return 1;
     }
 
-
     // 3. Merge the needed architectures from all projects into a single list of unique architectures
     char *archs_list[MAX_ARCHITECTURES];
     int num_archs = 0;

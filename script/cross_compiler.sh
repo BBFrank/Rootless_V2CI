@@ -13,6 +13,7 @@ thread_chroot_log_file=$7
 project_name=$8
 thread_chroot_target_dir=$9
 project_target_dir=${10}
+mem_limit=${11}
 
 if [ -z "$project_name" ]
 	then
@@ -28,7 +29,7 @@ fi
 
 # Determine if the repo is the main project or a dependency
 main_project="yes"
-if [ -z "$thread_chroot_target_dir" ] || [ -z "$project_target_dir" ]; then
+if [ -z "$thread_chroot_target_dir" ] || [ -z "$project_target_dir" ] || [ -z "$mem_limit" ]; then
 	main_project="no"
 fi
 
@@ -160,19 +161,34 @@ if [ "$main_project" = "yes" ]; then
 	cd "$thread_chroot_dir$thread_chroot_build_dir/$repo_name"
 	current_tag=$(git describe --tags --abbrev=0 2>/dev/null)
 	if [ -z "$current_tag" ]; then
-		release_dir="unstable"
+		release_version="unstable"
 	else
-		release_dir="$current_tag"
+		release_version="$current_tag"
 	fi
 
-	formatted_log "INFO" "$0" "$LINENO" "$project_name" "$debian_arch" "[From cross_compiler.sh for $debian_arch arch] Creating release directory: $project_target_dir/$release_dir"
-	mkdir -p "$project_target_dir/$release_dir"
+	formatted_log "INFO" "$0" "$LINENO" "$project_name" "$debian_arch" "[From cross_compiler.sh for $debian_arch arch] Creating daily directory: $project_target_dir/daily"
+	mkdir -p "$project_target_dir/daily"
 
-	# Copy without unnecessary checks (exists and is readable)
+	# Copy in the daily directory without unnecessary checks (exists and is readable)
 	if [ -f "$thread_chroot_dir$thread_chroot_target_dir/$repo_name-$debian_arch" ]; then
-		formatted_log "INFO" "$0" "$LINENO" "$project_name" "$debian_arch" "[From cross_compiler.sh for $debian_arch arch] Moving $repo_name-$debian_arch to $project_target_dir/$release_dir/$repo_name-$debian_arch"
-		install -m 0755 "$thread_chroot_dir$thread_chroot_target_dir/$repo_name-$debian_arch" "$project_target_dir/$release_dir/$repo_name-$debian_arch" || { formatted_log "ERROR" "$0" "$LINENO" "$project_name" "$debian_arch" "Error: Failed to copy final binary"; exit 1; }
-	fi
+		formatted_log "INFO" "$0" "$LINENO" "$project_name" "$debian_arch" "[From cross_compiler.sh for $debian_arch arch] Moving $repo_name-$debian_arch to $project_target_dir/daily/$repo_name-$release_version-$debian_arch"
+		install -m 0755 "$thread_chroot_dir$thread_chroot_target_dir/$repo_name-$debian_arch" "$project_target_dir/daily/$repo_name-$release_version-$debian_arch" || { formatted_log "ERROR" "$0" "$LINENO" "$project_name" "$debian_arch" "Error: Failed to copy final binary"; exit 1; }
+
+        # If we exceeded the mem_limit for the daily builds, remove the oldest files until we are under the limit (note: here we ignore the rotation since this will be handled by the cronjob - trade-off: it could happen that multiple builds exceed the limit due to old files that are still in the daily dir even if they were created more than 24h ago, because of low frequency of the cronjob;
+        # possible solutions: either increase cronjob frequency or implement a more complex logic here to also consider file ages. Anyway, this is a rare edge case, especially for academic projects, so we keep it simple for now)
+        total_daily_size=$(du -s "$project_target_dir/daily" | cut -f1)
+        while [ "$total_daily_size" -gt "$mem_limit" ]; do
+            oldest_file=$(ls -t "$project_target_dir/daily" | tail -n 1)
+            if [ "$oldest_file" = "$repo_name-$release_version-$debian_arch" ]; then
+                formatted_log "WARNING" "$0" "$LINENO" "$project_name" "$debian_arch" "[From cross_compiler.sh for $debian_arch arch] Only the just added file remains but daily memory limit exceeded; cannot remove it"
+                break
+            fi
+            oldest_file_size=$(du -s "$project_target_dir/daily/$oldest_file" | cut -f1)
+            rm -f "$project_target_dir/daily/$oldest_file"
+            total_daily_size=$((total_daily_size - oldest_file_size))
+            formatted_log "INFO" "$0" "$LINENO" "$project_name" "$debian_arch" "[From cross_compiler.sh for $debian_arch arch] Removed oldest file $oldest_file to respect daily memory limit"
+        done
+    fi
 
 	formatted_log "INFO" "$0" "$LINENO" "$project_name" "$debian_arch" "[From cross_compiler.sh for $debian_arch arch] Cross-compilation completed successfully"
 else

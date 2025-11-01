@@ -6,6 +6,9 @@
 #include <signal.h>
 #include <errno.h>
 #include <time.h>
+#include <execs.h>
+#include <fcntl.h>
+#include <sys/file.h>
 #include "utils/utils.h"
 #include "project_worker.h"
 #include "build_thread.h"
@@ -33,6 +36,110 @@ static void sleep_and_handle_interrupts(int poll_interval, FILE *log_fp, const c
             formatted_log(log_fp, "INFO", __FILE__, __LINE__, project_name, NULL, "Sleep interrupted, %u seconds remaining, continuing to wait...", time_left);
         }
     }
+}
+
+static int set_binaries_rotation_cronjob(project_t *prj, FILE *log_fp) {
+    // 0. First lock the cronjob setting process globally (on /tmp) to avoid race conditions (every project worker might try to set cronjobs simultaneously, modifying the same crontab of the same user, leaving it in an inconsistent state)
+    char cronjob_lock_file[MAX_CONFIG_ATTR_LEN];
+    snprintf(cronjob_lock_file, sizeof(cronjob_lock_file), "/tmp/cronjob_lock.lock");
+    int lock_fd = open(cronjob_lock_file, O_CREAT | O_RDWR, 0644);
+    if (lock_fd == -1) {
+        formatted_log(log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "Unable to open cronjob lock file: %s", strerror(errno));
+        return 1;
+    }
+    if (flock(lock_fd, LOCK_EX) == -1) {
+        formatted_log(log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "Unable to acquire lock on cronjob setting lock file: %s", strerror(errno));
+        close(lock_fd);
+        return 1;
+    }
+
+    // 1. Prepare the cronjob entry to set. Here we set the rotation cronjob (with all the necessary parameters) script to run at the end of each day (i.e., at 00:00)
+    /* Crontab entries have the following format:
+    * * * * * command to be executed
+    - - - - -
+    | | | | |
+    | | | | +----- Day of week (0 - 7) (Sunday=0 or 7)
+    | | | +------- Month (1 - 12)
+    | | +--------- Day of month (1 - 31)
+    | +----------- Hour (0 - 23)
+    +------------- Minute (0 - 59)
+    */
+    char cronjob_entry[MAX_COMMAND_LEN];
+    char *cronjob_script_expanded_path = expand_tilde(CRONJOB_SCRIPT_PATH);
+    snprintf(cronjob_entry, sizeof(cronjob_entry), "0 0 * * * %s %s %s %s %d %d %d %d %d %d\n", cronjob_script_expanded_path,
+        prj->name,
+        prj->target_dir,
+        prj->cronjob_log_file,
+        prj->binaries_limits->weekly_mem_limit,
+        prj->binaries_limits->monthly_mem_limit,
+        prj->binaries_limits->yearly_mem_limit,
+        prj->binaries_limits->weekly_interval,
+        prj->binaries_limits->monthly_interval,
+        prj->binaries_limits->yearly_interval
+    );
+    free(cronjob_script_expanded_path);
+
+    // 2. Get existing cron jobs and copy them to a temporary file only if their entries differ from the one we want to add (to avoid duplicates)
+    char command_get_cron[MAX_COMMAND_LEN];
+    snprintf(command_get_cron, sizeof(command_get_cron), "/usr/bin/crontab -u %s -l", getenv("USER"));
+    FILE *cron_pipe = popen(command_get_cron, "r");
+    if (!cron_pipe) {
+        formatted_log(log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "Unable to get existing crontab entries: %s", strerror(errno));
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        return 1;
+    }
+    
+    char temporary_crontab_file[MAX_CONFIG_ATTR_LEN];
+    snprintf(temporary_crontab_file, sizeof(temporary_crontab_file), "%s/%s-crontab", prj->main_project_build_dir, prj->name);
+    FILE *cron_fp = fopen(temporary_crontab_file, "w");
+    if (!cron_fp) {
+        formatted_log(log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "Unable to create temporary cron file %s: %s", temporary_crontab_file, strerror(errno));
+        pclose(cron_pipe);
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        return 1;
+    }
+    char line[MAX_COMMAND_LEN];
+    while (fgets(line, sizeof(line), cron_pipe)) {
+        if (strcmp(line, cronjob_entry) == 0) {
+            // Skip this line since it is identical to the one we want to add
+            continue;
+        }
+        fputs(line, cron_fp);
+    }
+    fclose(cron_fp);
+    pclose(cron_pipe);
+
+    // 3. Now append the new cron job for binaries rotation to the temporary crontab file
+    cron_fp = fopen(temporary_crontab_file, "a");
+    if (!cron_fp) {
+        formatted_log(log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "Unable to open temporary cron file for appending the new entry: %s", strerror(errno));
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        return 1;
+    }
+    fputs(cronjob_entry, cron_fp);
+    fclose(cron_fp);
+
+    // 4. Set the new cron tab
+    char command[MAX_COMMAND_LEN];
+    snprintf(command, sizeof(command), "/usr/bin/crontab -u %s %s", getenv("USER"), temporary_crontab_file);
+    int status = system_safe(command);
+    if (status != 0) {
+        formatted_log(log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "Failed to set new crontab from %s, system_safe() returned status %d", temporary_crontab_file, status);
+        flock(lock_fd, LOCK_UN);
+        close(lock_fd);
+        remove(temporary_crontab_file);
+        return 1;
+    }
+
+    // 5. Release the lock and clean up
+    flock(lock_fd, LOCK_UN);
+    close(lock_fd);
+    remove(temporary_crontab_file);
+
+    return 0;
 }
 
 static int recovery(project_t *prj, FILE **log_fp, char *main_build_dir) {
@@ -90,34 +197,41 @@ static int recovery(project_t *prj, FILE **log_fp, char *main_build_dir) {
 }
 
 static int handle_recovery(FILE **log_fp, project_t *prj, char *main_build_dir) {
-    // lock a recovery state file to avoid multiple recoveries at the same time (each project could attempt to setup the same chroot at the same time)
-    char recovery_state_file[64];
-    snprintf(recovery_state_file, sizeof(recovery_state_file), "/tmp/worker.recovery");
-    while (access(recovery_state_file, F_OK) == 0) {
-        formatted_log(*log_fp, "INFO", __FILE__, __LINE__, prj->name, NULL, "Recovery state file found, waiting other workers' recovery to complete...");
-        sleep(60);
+    // lock a recovery state file globally (on /tmp) to avoid multiple recoveries at the same time (each project could attempt to setup the same chroot at the same time)
+    char recovery_state_file_path[MAX_CONFIG_ATTR_LEN];
+    snprintf(recovery_state_file_path, sizeof(recovery_state_file_path), "/tmp/v2ci_worker_recovery_state.lock");
+    int fd = open(recovery_state_file_path, O_CREAT | O_RDWR, 0644);
+    if (fd == -1) {
+        formatted_log(*log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "[Recovery] Unable to open recovery state file: %s", strerror(errno));
+        return 1;
     }
-    FILE *recovery_fp = fopen(recovery_state_file, "w");
-    if (!recovery_fp) {
-        formatted_log(*log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "Unable to create recovery state file at %s: %s", recovery_state_file, strerror(errno));
+    if (flock(fd, LOCK_EX) == -1) {
+        formatted_log(*log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "[Recovery] Unable to acquire lock on recovery state file: %s", strerror(errno));
+        close(fd);
         return 1;
     }
 
     // Start recovery operations
-    formatted_log(*log_fp, "INFO", __FILE__, __LINE__, prj->name, NULL, "Starting recovery operations...");
+    formatted_log(*log_fp, "INFO", __FILE__, __LINE__, prj->name, NULL, "[Recovery] Starting recovery operations...");
     int recovery_result = recovery(prj, log_fp, main_build_dir);
     if (recovery_result == 1) {
-        formatted_log(*log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "Recovery operations failed for project %s.", prj->name);
-        fclose(recovery_fp);
-        remove(recovery_state_file);
+        formatted_log(*log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "[Recovery] Recovery operations failed for project %s.", prj->name);
+        if (flock(fd, LOCK_UN) == -1) {
+            formatted_log(*log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "[Recovery] Unable to release lock on recovery state file: %s", strerror(errno));
+        }
+        close(fd);
         return 1;
     } else if (recovery_result == 2) {
-        formatted_log(*log_fp, "INTERRUPT", __FILE__, __LINE__, prj->name, NULL, "Termination signal received during recovery operations for project %s, exiting...", prj->name);
+        formatted_log(*log_fp, "INTERRUPT", __FILE__, __LINE__, prj->name, NULL, "[Recovery] Termination signal received during recovery operations for project %s, exiting...", prj->name);
     } else {
-        formatted_log(*log_fp, "INFO", __FILE__, __LINE__, prj->name, NULL, "Recovery operations completed successfully for project %s.", prj->name);
+        formatted_log(*log_fp, "INFO", __FILE__, __LINE__, prj->name, NULL, "[Recovery] Recovery operations completed successfully for project %s.", prj->name);
     }
-    fclose(recovery_fp);
-    remove(recovery_state_file);
+
+    // Release the lock and clean up
+    if (flock(fd, LOCK_UN) == -1) {
+        formatted_log(*log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "[Recovery] Unable to release lock on recovery state file: %s", strerror(errno));
+    }
+    close(fd);
     return 0;
 }
 
@@ -183,6 +297,17 @@ int project_worker(project_t *prj, char *main_build_dir) {
     char chroot_dir[MAX_CONFIG_ATTR_LEN];
     char chroot_build_dir[MAX_CONFIG_ATTR_LEN];
     char worker_tmp_chroot_log_file[MAX_CONFIG_ATTR_LEN+20];
+
+    formatted_log(log_fp, "INFO", __FILE__, __LINE__, prj->name, NULL, "Initial directories setup completed successfully for project %s.", prj->name);
+
+    // Set the final binaries rotation cronjob with crontab
+    if (set_binaries_rotation_cronjob(prj, log_fp) != 0) {
+        formatted_log(log_fp, "ERROR", __FILE__, __LINE__, prj->name, NULL, "Failed to set the binaries rotation cronjob for project %s.", prj->name);
+        fclose(log_fp);
+        return 1;
+    }
+
+    formatted_log(log_fp, "INFO", __FILE__, __LINE__, prj->name, NULL, "Binaries rotation cronjob set successfully for project %s.", prj->name);
 
     // Main loop
     while (1) {

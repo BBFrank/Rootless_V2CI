@@ -8,11 +8,11 @@ projects:
         weekly: 1440    # e.g. 1440 minutes = 1 day (one day apart from one saved binary to another in the "weekly" folder)
         monthly: 10080  # e.g. 10080 minutes = 7 days (one week apart from one saved binary to another in the "monthly" folder)
         yearly: 43200   # e.g. 43200 minutes = 30 days (one month apart from one saved binary to another in the "yearly" folder)
-      mem-limit:  # Maximum storage space (in MB) allowed for each folder inside target_dir
-        daily: 500       # Maximum storage space (in MB) allowed for the "daily" folder inside target_dir
-        weekly: 2000     # Maximum storage space (in MB) allowed for the "weekly" folder inside target_dir
-        monthly: 5000    # Maximum storage space (in MB) allowed for the "monthly" folder inside target_dir
-        yearly: 20000    # Maximum storage space (in MB) allowed for the "yearly" folder inside target_dir
+      mem-limit:  # Maximum storage space (in KB) allowed for each folder inside target_dir
+        daily: 10000       # Maximum storage space (10000 in KB -> 10 MB) allowed for the "daily" folder inside target_dir
+        weekly: 50000      # 50 MB maximum for the "weekly" folder inside target_dir
+        monthly: 200000    # 200 MB maximum for the "monthly" folder inside target_dir
+        yearly: 1000000    # 1 GB maximum for the "yearly" folder inside target_dir
     source:
       main_repo:
         git_url: https://github.com/virtualsquare/sshlirp

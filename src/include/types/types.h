@@ -13,6 +13,7 @@
 #define INSTALL_PACKAGES_SCRIPT_PATH SCRIPTS_DIR_PATH "/install_packages_in_chroot.sh"
 #define CLONE_OR_PULL_SCRIPT_PATH SCRIPTS_DIR_PATH "/clone_or_pull_for_project.sh"
 #define BUILD_SCRIPT_PATH SCRIPTS_DIR_PATH "/cross_compiler.sh"
+#define CRONJOB_SCRIPT_PATH SCRIPTS_DIR_PATH "/binaries_rotation_cronjob.sh"
 
 #define MAX_ARCHITECTURES 9
 #define MAX_DEPENDENCIES 16
@@ -65,7 +66,8 @@ typedef struct binaries_limits_for_project {
 typedef struct project {
     char name[64];
     char main_project_build_dir[CONFIG_ATTR_LEN];       // <cfg.build_dir>/<project.name>
-    char worker_log_file[MAX_CONFIG_ATTR_LEN];              // <main_project_build_dir>/logs/worker.log
+    char worker_log_file[MAX_CONFIG_ATTR_LEN];          // <main_project_build_dir>/logs/worker.log
+    char cronjob_log_file[MAX_CONFIG_ATTR_LEN];         // <main_project_build_dir>/logs/binaries_rotation_cronjob.log
     char target_dir[CONFIG_ATTR_LEN];                   // Absolute path got from config file
 
     char repo_url[MAX_CONFIG_ATTR_LEN];
