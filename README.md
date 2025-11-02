@@ -67,15 +67,19 @@ make
 
 ### Run
 
-After compilation, two statically linked binaries are available in `build/`.
+After compilation, two statically linked binaries are available in `build/`. Before starting the engine, ensure tha all the scripts inside the `scripts/` directory are executable:
 
-Start the daemons:
+```bash
+chmod +x ../scripts/*
+```
+
+Then you can start the daemons with the following command:
 
 ```bash
 ./v2ci_start
 ```
 
-Stop the daemons:
+In order to stop them run the following command instead:
 
 ```bash
 ./v2ci_stop
