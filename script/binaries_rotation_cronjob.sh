@@ -78,28 +78,36 @@ rotation_engine() {
                 break
             fi
 
-            # Get the most recent later_file modification time
+            # Get the most recent later_file modification time in order to check time interval constraint
             recent_later_file=$(ls -t "$later_dir" | head -n 1)
             if [ -n "$recent_later_file" ]; then
                 mtime_recent_later=$(stat -c %Y "$later_dir/$recent_later_file")
-            else
-                mtime_recent_later=0
+                minutes_diff=$(minutes_distance_calculator "$mtime_oldest_current" "$mtime_recent_later")
+                if [ "$minutes_diff" -lt "$INTERVAL_LIMIT" ]; then
+                    formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Time interval constraint not satisfied between oldest $rotation_type file $oldest_current_file and most recent later file $recent_later_file. Deleting the oldest $rotation_type file."
+                    rm -f "$current_dir/$oldest_current_file"
+                    continue
+                fi
             fi
 
-            # Compute the minutes difference between the oldest current file and the most recent later_file, the dimension of the oldest current file, and the total dimension of the later directory in order to execute the rotation within constraints
-            minutes_diff=$(minutes_distance_calculator "$mtime_oldest_current" "$mtime_recent_later")
+            # Compute the dimension of the oldest current file, and the total dimension of the later directory in order to check memory limit constraint
             oldest_current_mem_kb=$(du -k "$current_dir/$oldest_current_file" | cut -f1)
             later_dir_mem_kb=$(du -sk "$later_dir" | cut -f1)
-            
-            # Rotate the oldest current file to later directory only if within memory limit and time interval constraints
-            # Note: if there isn't any file in the later directory, the time interval constraint is automatically satisfied (the minutes_diff will be very large)
-            if [ $((later_dir_mem_kb + oldest_current_mem_kb)) -le $MEM_LIMIT ] && [ "$minutes_diff" -ge "$INTERVAL_LIMIT" ]; then
-                mv "$current_dir/$oldest_current_file" "$later_dir/"
-                formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Moved file $oldest_current_file from $current_dir to $later_dir directory."
-            else
-                formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] $rotation_type file $oldest_current_file cannot be moved to $later_dir directory due to memory limit or time interval constraints. Removing it from $current_dir directory."
-                rm -f "$current_dir/$oldest_current_file"
-            fi
+            forcasted_later_dir_mem_kb=$((later_dir_mem_kb + oldest_current_mem_kb))
+            while [ "$forcasted_later_dir_mem_kb" -gt "$MEM_LIMIT" ]; do
+                oldest_later_file=$(ls -t "$later_dir" | tail -n 1)
+                if [ -z "$oldest_later_file" ]; then
+                    break
+                fi
+                oldest_later_file_size=$(du -s "$later_dir/$oldest_later_file" | cut -f1)
+                rm -f "$later_dir/$oldest_later_file"
+                forcasted_later_dir_mem_kb=$((forcasted_later_dir_mem_kb - oldest_later_file_size))
+                formatted_log "INFO" "$0" "$LINENO" "$project_name" "$debian_arch" "[From cross_compiler.sh for $debian_arch arch] Removed oldest file $oldest_later_file to respect $rotation_type memory limit"
+            done
+
+            # Move the oldest current file to the later directory
+            mv "$current_dir/$oldest_current_file" "$later_dir/"
+            formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Moved oldest $rotation_type file $oldest_current_file from $current_dir to $later_dir."
         done
     else
         formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] No files found in $rotation_type directory. Skipping $rotation_type rotation."
@@ -128,22 +136,7 @@ weekly_dir="$project_target_dir/weekly"
 monthly_dir="$project_target_dir/monthly"
 yearly_dir="$project_target_dir/yearly"
 
-# 1. DAILY ROTATION
-formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Performing daily rotation."
-mkdir -p "$weekly_dir"
-rotation_engine "daily" "$daily_dir" "$weekly_dir"
-
-# 2. WEEKLY ROTATION
-formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Performing weekly rotation."
-mkdir -p "$monthly_dir"
-rotation_engine "weekly" "$weekly_dir" "$monthly_dir"
-
-# 3. MONTHLY ROTATION
-formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Performing monthly rotation."
-mkdir -p "$yearly_dir"
-rotation_engine "monthly" "$monthly_dir" "$yearly_dir"
-
-# 4. YEARLY ROTATION -> no further directory to move to, so just clean up too old files from yearly directory
+# 1. YEARLY ROTATION -> no further directory to move to, so just clean up too old files from yearly directory
 formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Performing yearly rotation cleanup."
 oldest_yearly_file=$(ls -t "$yearly_dir" | tail -n 1)
 if [ -n "$oldest_yearly_file" ]; then
@@ -164,5 +157,20 @@ if [ -n "$oldest_yearly_file" ]; then
 else
     formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] No files found in yearly directory. Skipping yearly rotation cleanup."
 fi
+
+# 2. MONTHLY ROTATION
+formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Performing monthly rotation."
+mkdir -p "$yearly_dir"
+rotation_engine "monthly" "$monthly_dir" "$yearly_dir"
+
+# 3. WEEKLY ROTATION
+formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Performing weekly rotation."
+mkdir -p "$monthly_dir"
+rotation_engine "weekly" "$weekly_dir" "$monthly_dir"
+
+# 4. DAILY ROTATION
+formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Performing daily rotation."
+mkdir -p "$weekly_dir"
+rotation_engine "daily" "$daily_dir" "$weekly_dir"
 
 formatted_log "INFO" "$0" "$LINENO" "$project_name" "" "[From binaries_rotation_cronjob.sh] Binaries rotation cronjob for project $project_name completed."
